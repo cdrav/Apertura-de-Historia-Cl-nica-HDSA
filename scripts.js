@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Detectar rol actual (simple check)
                 const rol = document.getElementById('containerFiltros').classList.contains('d-none') ? 'soporte' : 'admin';
                 cargarDatosDesdeGoogle(rol, true); // true para modo silencioso (sin mensaje de bienvenida)
-                
+
                 // Limpiar formulario
                 document.getElementById('aperturaForm').reset();
                 filaSeleccionada = null;
@@ -306,4 +306,33 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(e => Swal.fire('Error', 'No se pudo actualizar: ' + e, 'error'));
     });
+
+    function actualizarEstadoSolicitud(fila, estado) {
+        const payload = {
+            action: 'update',
+            fila: fila,
+            estado: estado,
+            gestionado_por: document.getElementById('gestionadoPor').value,
+            fecha_gestion: document.getElementById('fechaAtencion').value,
+            observaciones: document.getElementById('observacionesGestion').value
+        };
+
+        Swal.fire({title: 'Actualizando...', didOpen: () => Swal.showLoading()});
+
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if(data.result === 'success') {
+                Swal.fire('¡Actualizado!', 'Estado actualizado correctamente', 'success');
+                const rol = document.getElementById('containerFiltros').classList.contains('d-none') ? 'soporte' : 'admin';
+                cargarDatosDesdeGoogle(rol, true);
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(e => Swal.fire('Error', 'No se pudo actualizar: ' + e, 'error'));
+    }
 });
