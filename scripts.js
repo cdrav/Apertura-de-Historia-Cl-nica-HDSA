@@ -129,9 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (rol === 'admin') {
             // Mostrar filtros y resetear vista
             containerFiltros.classList.remove('d-none');
-            filtroEstado.value = 'Todos';
+            filtroEstado.value = 'Pendiente';
             filtroFecha.value = '';
-            aplicarFiltrosTabla('Todos', '');
+            aplicarFiltrosTabla('Pendiente', '');
         }
     }
 
@@ -155,8 +155,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!silent) Swal.fire('Bienvenido Soporte', 'Visualizando solo pendientes', 'success');
                 aplicarFiltrosTabla('Pendiente', '');
             } else {
-                if (!silent) Swal.fire('Bienvenido Robert', 'Acceso total concedido', 'success');
-                aplicarFiltrosTabla('Todos', '');
+                if (!silent) Swal.fire('Bienvenido Robert', 'Iniciando con solicitudes pendientes', 'success');
+                aplicarFiltrosTabla('Pendiente', '');
             }
         })
         .catch(error => {
@@ -168,15 +168,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderizarTabla(datos) {
         datosGlobales = datos; // Guardamos los datos en memoria
         const tbody = document.getElementById('tablaCuerpo');
-        tbody.innerHTML = ''; // Limpiar tabla
-
-        datos.forEach((item, index) => {
+        
+        // Construir todo el HTML de una vez para optimizar el rendimiento
+        const htmlFilas = datos.map((item, index) => {
             // Determinar color badge
             let badgeClass = 'bg-warning text-dark';
             if(item.estado === 'Realizado') badgeClass = 'bg-success';
             if(item.estado === 'Rechazado') badgeClass = 'bg-danger';
 
-            const row = `
+            return `
                 <tr onclick="cargarSolicitudParaGestion(${index})" style="cursor: pointer;" title="Clic para gestionar">
                     <td>${item.fecha_solicitud}</td>
                     <td>${item.paciente_nombre} (${item.paciente_id})</td>
@@ -187,8 +187,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${item.gestionado_por || '-'}</td>
                 </tr>
             `;
-            tbody.insertAdjacentHTML('beforeend', row);
-        });
+        }).join('');
+
+        tbody.innerHTML = htmlFilas;
     }
 
     function aplicarFiltrosTabla(estado, fecha) {
@@ -266,73 +267,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // 5. Botón Guardar Gestión
-    document.getElementById('btnGuardarGestion').addEventListener('click', function() {
-        if (!filaSeleccionada) {
-            Swal.fire('Error', 'No hay ninguna solicitud seleccionada', 'error');
-            return;
-        }
-
-        const payload = {
-            action: 'update',
-            fila: filaSeleccionada,
-            estado: document.getElementById('estadoSolicitud').value,
-            gestionado_por: document.getElementById('gestionadoPor').value,
-            fecha_gestion: document.getElementById('fechaAtencion').value,
-            observaciones: document.getElementById('observacionesGestion').value
-        };
-
+    // 5. Función centralizada para actualizaciones (Refactorizada para evitar duplicidad)
+    function ejecutarActualizacion(payload) {
         Swal.fire({title: 'Actualizando...', didOpen: () => Swal.showLoading()});
 
-        fetch(SCRIPT_URL, {
+        return fetch(SCRIPT_URL, {
             method: 'POST',
             body: JSON.stringify(payload)
         })
         .then(r => r.json())
         .then(data => {
             if(data.result === 'success') {
-                Swal.fire('¡Actualizado!', 'Solicitud actualizada correctamente', 'success');
-                // Recargar tabla para ver cambios
-                // Detectar rol actual (simple check)
+                Swal.fire('¡Éxito!', 'La solicitud ha sido actualizada', 'success');
                 const rol = document.getElementById('containerFiltros').classList.contains('d-none') ? 'soporte' : 'admin';
-                cargarDatosDesdeGoogle(rol, true); // true para modo silencioso (sin mensaje de bienvenida)
-
-                // Limpiar formulario
+                cargarDatosDesdeGoogle(rol, true);
                 document.getElementById('aperturaForm').reset();
                 filaSeleccionada = null;
             } else {
                 throw new Error(data.error);
             }
         })
-        .catch(e => Swal.fire('Error', 'No se pudo actualizar: ' + e, 'error'));
-    });
+        .catch(e => Swal.fire('Error', 'No se pudo completar la operación: ' + e.message, 'error'));
+    }
 
-    function actualizarEstadoSolicitud(fila, estado) {
-        const payload = {
+    document.getElementById('btnGuardarGestion').addEventListener('click', function() {
+        if (!filaSeleccionada) {
+            Swal.fire('Error', 'No hay ninguna solicitud seleccionada', 'error');
+            return;
+        }
+        ejecutarActualizacion({
             action: 'update',
-            fila: fila,
-            estado: estado,
+            fila: filaSeleccionada,
+            estado: document.getElementById('estadoSolicitud').value,
             gestionado_por: document.getElementById('gestionadoPor').value,
             fecha_gestion: document.getElementById('fechaAtencion').value,
             observaciones: document.getElementById('observacionesGestion').value
-        };
-
-        Swal.fire({title: 'Actualizando...', didOpen: () => Swal.showLoading()});
-
-        fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        })
-        .then(r => r.json())
-        .then(data => {
-            if(data.result === 'success') {
-                Swal.fire('¡Actualizado!', 'Estado actualizado correctamente', 'success');
-                const rol = document.getElementById('containerFiltros').classList.contains('d-none') ? 'soporte' : 'admin';
-                cargarDatosDesdeGoogle(rol, true);
-            } else {
-                throw new Error(data.error);
-            }
-        })
-        .catch(e => Swal.fire('Error', 'No se pudo actualizar: ' + e, 'error'));
-    }
+        });
+    });
 });
